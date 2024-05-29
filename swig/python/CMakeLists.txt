@@ -27,43 +27,7 @@ if(APPLE)
   endif()
 endif()
 
-function(CasadiGetPythonVersionMajor VERSION_MAJOR_RESULT INCLUDE_PATH)
-  set(MATCH_STRING "#define[ \t]+PY_MAJOR_VERSION[ \t]+([0-9]+)")
-  file(STRINGS "${INCLUDE_PATH}/patchlevel.h" PY_MAJOR_VERSION REGEX ${MATCH_STRING})
-  string(REGEX REPLACE "${MATCH_STRING}" "\\1" PYTHON_VERSION_MAJOR "${PY_MAJOR_VERSION}")
-  set(${VERSION_MAJOR_RESULT} ${PYTHON_VERSION_MAJOR} PARENT_SCOPE)
-endfunction()
-
-if(SWIG_EXPORT)
-  if(WITH_PYTHON3)
-    set(PYTHON_VERSION_MAJOR 3)
-  else()
-    set(PYTHON_VERSION_MAJOR 2)
-  endif()
-else()
-  if(PYTHON_INCLUDE_DIR)
-    set(PYTHON_INCLUDE_PATH ${PYTHON_INCLUDE_DIR})
-  else()
-    # Find packages
-    if(WITH_PYTHON3)
-    set(MINPYVERSION "3")
-    else()
-    set(MINPYVERSION "")
-    endif()
-
-    # We don't really need the libs, but the headers.
-    find_package(PythonInterp ${MINPYVERSION})
-    find_package(PythonLibs ${MINPYVERSION})
-    if(NOT PYTHON_INCLUDE_PATH)
-      message(SEND_ERROR "Python include headers not found, but required." )
-    endif()
-  endif()
-  
-  CasadiGetPythonVersionMajor(PYTHON_VERSION_MAJOR "${PYTHON_INCLUDE_PATH}")
-  include_directories(${PYTHON_INCLUDE_PATH})
-  
-  
-endif()
+find_package(Python COMPONENTS Development REQUIRED)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -82,10 +46,10 @@ set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-DPy_USING_UNICODE")
 set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-noproxydel")
 set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-fastunpack")
 set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-modernargs")
-if("${PYTHON_VERSION_MAJOR}" STREQUAL "3")
-set(PYTHONFLAG "3")
-set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-py3")
-set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-DWITH_PYTHON3")
+if("${Python_VERSION_MAJOR}" STREQUAL "3")
+  set(PYTHONFLAG "3")
+  set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-py3")
+  set(CMAKE_SWIG_FLAGS ${CMAKE_SWIG_FLAGS} "-DWITH_PYTHON3")
 endif()
 
 message("PYTHONFLAGS: ${CMAKE_SWIG_FLAGS} ${PYTHONFLAG}")
@@ -118,15 +82,7 @@ endif()
 # Make target
 add_custom_target(python DEPENDS _casadi)
 
-add_library(_casadi MODULE ${PYTHON_FILE})
-
-set_target_properties(_casadi PROPERTIES PREFIX "")
-if(WIN32 AND NOT CYGWIN)
-  set_target_properties(_casadi PROPERTIES SUFFIX ".pyd")
-  set(CASADI_PYTHON_LIBRARY_SUFFIX ".pyd")
-else()
-  set(CASADI_PYTHON_LIBRARY_SUFFIX ${CMAKE_SHARED_MODULE_SUFFIX})
-endif()
+python_add_library(_casadi MODULE WITH_SOABI ${PYTHON_FILE})
 
 if(APPLE AND ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU"))
   set_target_properties(_casadi PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
@@ -154,13 +110,7 @@ message("COMPILE_FLAGS: ${COMPILE_FLAGS}")
 
 set_target_properties(_casadi PROPERTIES COMPILE_FLAGS "${COMPILE_FLAGS}")
 
-if(WIN32) # dlls don't allow missing symbols
-  if(NOT PYTHON_LIBRARY)
-    message(SEND_ERROR "Python libraries not found, but required." )
-  endif()
-  target_link_libraries(_casadi ${PYTHON_LIBRARY})
-endif()
-target_link_libraries(_casadi casadi)
+target_link_libraries(_casadi PRIVATE casadi)
 
 # Custom installation command for Python
 add_custom_target(install_python
@@ -177,19 +127,11 @@ install(TARGETS _casadi
   COMPONENT install_python
 )
 
-if (SWIG_IMPORT)
 # Install Python proxy classes
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/target${PYTHONFLAG}/extra/casadi.py
   DESTINATION "${PYTHON_PREFIX}/casadi"
   COMPONENT install_python
 )
-else()
-# Install Python proxy classes
-install(FILES ${PROJECT_BINARY_DIR}/swig/python/casadi.py
-  DESTINATION "${PYTHON_PREFIX}/casadi"
-  COMPONENT install_python
-)
-endif()
 
 # Install Python tools
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tools
@@ -235,7 +177,6 @@ if (WITH_EXTENDING_CASADI)
   elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set_target_properties(_extending_casadi PROPERTIES COMPILE_FLAGS "-Wno-dynamic-class-memaccess -Wno-self-assign -Wno-maybe-uninitialized ${MAYBE_WERROR} -fno-builtin-strdup -fno-builtin-strndup")
   endif()
-  set(CASADI_PYTHON_LIBRARY ${SWIG_MODULE_extending_casadi_REAL_NAME}${CASADI_PYTHON_LIBRARY_SUFFIX})
 
   add_custom_target(extending_casadi_python DEPENDS _extending_casadi extending_casadi)
 
