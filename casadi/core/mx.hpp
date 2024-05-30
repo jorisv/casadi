@@ -841,7 +841,7 @@ namespace casadi {
 #endif // SWIG
 
     /** \bried Return all elements of a that do not occur in b, preserving order */
-    friend std::vector<MX> difference(const std::vector<MX>& a, const std::vector<MX>& b);
+    CASADI_EXPORT friend std::vector<MX> difference(const std::vector<MX>& a, const std::vector<MX>& b);
 
     /** \brief returns itself, but with an assertion attached
     *
