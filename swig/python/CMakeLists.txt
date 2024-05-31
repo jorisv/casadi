@@ -27,7 +27,22 @@ if(APPLE)
   endif()
 endif()
 
-find_package(Python COMPONENTS Development REQUIRED)
+# This hack avoid some issues with conda-forge crossbuilding
+# and a bug in find_package(Python) scripts.
+# When calling find_package(Python COMPONENTS Interpreter Development)
+# with CMAKE_CROSSCOMPILING=ON the Python_SOABI variable
+# is never set (see https://gitlab.kitware.com/cmake/cmake/-/issues/25145).
+# The right strategy is to find Interpreter and Development components separately.
+# Unfortunately, this strategy rely on python3-config script, but the Finder
+# doesn't find the good one (host instead of target) and python3-config is not installed
+# when working with PyPy.
+# To avoid this issue, we deactivate the CMAKE_CROSSCOMPILING flag before calling find_package(Python).
+# Python_SOABI is then founded with the hacked conda-forge Python interpreter instead of
+# python3-config script.
+set(_CMAKE_CROSSCOMPILING ${CMAKE_CROSSCOMPILING})
+set(CMAKE_CROSSCOMPILING 0)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+set(CMAKE_CROSSCOMPILING ${_CMAKE_CROSSCOMPILING})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
